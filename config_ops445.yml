@@ -1,0 +1,95 @@
+---
+- name: Configure OPS445 Linux VM
+  hosts: vmlab
+  become: yes
+  vars:
+    seneca_id: bjpatel18
+    motd_warning: "WARNING: used by ICT faculty/students only.\n"
+  tasks:
+
+    # 1. Update /etc/motd
+    - name: Setup MOTD
+      copy:
+        dest: /etc/motd
+        content: "{{ motd_warning }}"
+
+    # 2. Update Apache
+    - name: Ensure Apache is installed
+      yum:
+        name: httpd
+        state: latest
+
+    - name: Restart Apache
+      service:
+        name: httpd
+        state: restarted
+
+    # 3. Install EPEL
+    - name: Install EPEL repository
+      yum:
+        name: epel-release
+        state: present
+
+    # 4. Remove tree package
+    - name: Remove tree package
+      yum:
+        name: tree
+        state: absent
+
+    # 5. Set hostname
+    - name: Set hostname
+      hostname:
+        name: "{{ seneca_id }}"
+
+    # 6. Create new sudo user
+    - name: Create user
+      user:
+        name: "{{ seneca_id }}"
+        groups: wheel
+        append: yes
+        shell: /bin/bash
+        create_home: yes
+
+    # 7. Configure passwordless sudo for new user
+    - name: Allow passwordless sudo
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: "^{{ seneca_id }}"
+        line: "{{ seneca_id }} ALL=(ALL) NOPASSWD:ALL"
+        validate: 'visudo -cf %s'
+
+    # 8. Setup SSH authorized keys for new user
+    - name: Create .ssh directory
+      file:
+        path: "/home/{{ seneca_id }}/.ssh"
+        state: directory
+        mode: '0700'
+        owner: "{{ seneca_id }}"
+        group: "{{ seneca_id }}"
+
+    - name: Copy public key to new user
+      copy:
+        src: "~/.ssh/id_rsa.pub"
+        dest: "/home/{{ seneca_id }}/.ssh/authorized_keys"
+        owner: "{{ seneca_id }}"
+        group: "{{ seneca_id }}"
+        mode: '0600'
+
+    # 9. Create lab directories
+    - name: Create lab directories
+      file:
+        path: "/home/{{ seneca_id }}/ops445/lab{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ seneca_id }}"
+        group: "{{ seneca_id }}"
+      loop: 
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        - 8
